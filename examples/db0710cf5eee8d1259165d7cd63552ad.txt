@@ -1,0 +1,167 @@
+; An example program where a face jumps about. Wait for it to hit the corner 
+; and you win. How exciting
+;
+; If you'd rather take control, you can also press the "S" key to toggle manual 
+; control on and off.
+;
+; When in manual mode, you can move with:
+; A: left
+; D: right
+; W: up
+; X: down
+
+; Some definitions. These must appear before any other instructions
+DEFINE REGISTER X_COORD v0
+DEFINE REGISTER Y_COORD v1
+
+DEFINE REGISTER IS_MOVING_DOWN v2
+DEFINE REGISTER IS_MOVING_RIGHT v3
+DEFINE REGISTER IS_MANUAL_CONTROL v4
+
+DEFINE REGISTER TOGGLE_DELAY v5
+DEFINE REGISTER TOGGLE_KEY v6
+
+DEFINE REGISTER MOVE_UP_KEY v7
+DEFINE REGISTER MOVE_RIGHT_KEY v8
+DEFINE REGISTER MOVE_DOWN_KEY v9
+DEFINE REGISTER MOVE_LEFT_KEY vA
+
+DEFINE REGISTER ONE vB
+
+DEFINE BYTE RIGHT_LIMIT 56
+DEFINE BYTE BOTTOM_LIMIT 26
+
+; Jump to main entry point (Feels cleaner this way. You do you)
+JP main
+
+; Lets draw a face
+; Indents don't matter. But we're not animals
+smile:
+    0b00100100
+    0b00100100
+    0b00000000
+    0b10011001
+    0b01000010
+    0b00111100
+
+
+moveVertical:
+    ; If we're not moving down, jump to "moveUp"
+    SE IS_MOVING_DOWN, 0
+    JP moveDown
+    JP moveUp
+    
+moveUp:
+    SNE Y_COORD, 0
+    RET
+    
+    SUB Y_COORD, ONE
+    SNE Y_COORD, 0       ; If we're at the top
+    LD IS_MOVING_DOWN, 1 ; start moviing down
+    RET
+    
+moveDown:
+    SNE Y_COORD, BOTTOM_LIMIT
+    RET
+    
+    ADD Y_COORD, 1
+    SNE Y_COORD, BOTTOM_LIMIT ; If we're at the bottom
+    LD IS_MOVING_DOWN, 0      ; start moving up
+    RET
+        
+        
+moveHorizontal:
+    ; Same idea as move vertical
+    SE IS_MOVING_RIGHT, 0
+    JP moveRight
+    JP moveLeft
+    
+moveLeft:
+    SNE X_COORD, 0
+    RET
+    
+    SUB X_COORD, ONE
+    SNE X_COORD, 0
+    LD IS_MOVING_RIGHT, 1
+    RET
+    
+moveRight:
+    SNE X_COORD, RIGHT_LIMIT
+    RET
+    
+    ADD X_COORD, 1
+    SNE X_COORD, RIGHT_LIMIT
+    LD IS_MOVING_RIGHT, 0
+    RET
+    
+checkToggle:
+    LD vC, DT ; Load the delay timer value
+    SE vC, 0 ; If it is not 0, return
+    RET
+    SKP TOGGLE_KEY ; If our toggle key is pressed, flip the flag, otherwise return
+    RET
+    XOR IS_MANUAL_CONTROL, ONE
+    LD DT, TOGGLE_DELAY ; Reset the delay timer
+    RET
+
+update:
+    CALL checkToggle
+    SE IS_MANUAL_CONTROL, 0 ; If not moving automatically, jump to "moveManual"
+    JP moveManual
+    CALL moveVertical
+    CALL moveHorizontal
+    RET
+    
+moveManual: 
+    SKNP MOVE_UP_KEY    ; Check our up key
+    JP moveUp
+    SKNP MOVE_RIGHT_KEY ; Check our right key
+    JP moveRight
+    SKNP MOVE_DOWN_KEY  ; Check our down key
+    JP moveDown
+    SKNP MOVE_LEFT_KEY  ; Check our left key
+    JP moveLeft
+    RET
+
+
+draw:
+    CLS ; Clear the screen. A classic
+    DRW X_COORD, Y_COORD, 6 ; Draw our face (6 bytes) at our X and X coords (v0 & v1)
+    RET
+
+
+mainLoop:
+    ; Infinite loop. Update -> Draw -> Forever -> And -> Ever
+    CALL update
+    CALL draw
+    JP mainLoop
+
+
+main:
+    ; Initialize a bunch of values
+    LD X_COORD, 0
+    LD Y_COORD, 0
+    LD IS_MOVING_RIGHT, 1
+    LD IS_MOVING_DOWN, 1
+    LD IS_MANUAL_CONTROL, 0
+    
+    ; Delay between toggle checks, stops the value flipping the flag multiple times in a 
+    ; single press
+    LD TOGGLE_DELAY, 30
+    
+    ; Set movement keys
+    LD TOGGLE_KEY, 8     ; (8 maps to the S key)
+    LD MOVE_UP_KEY, 5    ; (5 maps to the W key)
+    LD MOVE_RIGHT_KEY, 9 ; (9 maps to the D key)
+    LD MOVE_DOWN_KEY, 0  ; (0 maps to the X key)
+    LD MOVE_LEFT_KEY, 7  ; (7 maps to the A key)
+    
+    LD ONE, 1
+    
+    ; Point I at our smile in memory for drawing later
+    LD I, smile
+    
+    ; Make some calls
+    CALL draw
+    JP mainLoop
+    
